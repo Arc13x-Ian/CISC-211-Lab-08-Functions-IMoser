@@ -19,7 +19,7 @@
 .type nameStr,%gnu_unique_object
     
 /*** STUDENTS: Change the next line to your name!  **/
-nameStr: .asciz "Inigo Montoya"  
+nameStr: .asciz "Ian Moser"  
 
 .align   /* realign so that next mem allocations are on word boundaries */
  
@@ -84,7 +84,24 @@ final_Product:   .word     0
 asmUnpack:   
     
     /*** STUDENTS: Place your asmUnpack code BELOW this line!!! **************/
+    push {r4-r11,LR}
+    /*Arm Calling Convention Part 1*/
     
+    mov r4, r0
+    asr r4, r4, 16
+    /*Getting the 16 MSBits set into one register*/
+    str r4, [r1]
+    
+    mov r5, r0
+    ror r5, r5, 16
+    asr r5, r5, 16
+    /*ror moves the 16 bits from the LSB to the MSB so I can sigh exstend them
+     with asr.*/
+    str r5, [r2]
+    
+    pop {r4-r11,LR}
+
+    mov pc, lr	 /*and the thing that ends the function*/
     /*** STUDENTS: Place your asmUnpack code ABOVE this line!!! **************/
 
 
@@ -102,8 +119,35 @@ asmUnpack:
 asmAbs:  
 
     /*** STUDENTS: Place your asmAbs code BELOW this line!!! **************/
+    push {r4-r11,LR}
+    /*Arm Calling Convention Part 1*/
     
+    
+    MOV r7, 0
+    MOV r8, 1
+    /*setting up for sign filling, with + in r7 and - in r8*/
+    
+    CMP r0, 0
+    STRGE r7, [r2]
+    STRLT r8, [r2]
+    /*compares signed value to zero, assigning a 0 to the sign address
+    if CMP is positive and a 1 to the sign if the CMP is negative.*/
+    
+    CMP r0, 0
+    /*I know I don't need to reset the flags here, but it helps me to have
+     this bit of code to remind me what the following flags are checking-
+     I'm checking to see if the signed value is positive to see if I need to
+     just store it or if I need to 2's complement it to get the abs value*/
+    STRGE r0, [r1]
+    NEGLT r0, r0
+    STRLT r0, [r1]
+    /*if r0 is 0 or more, store it as absolute. If not, put its negative into r9
+     and store that instead.*/
+    
+    
+    pop {r4-r11,LR}
 
+    mov pc, lr	 /*and the thing that ends the function*/
     /*** STUDENTS: Place your asmAbs code ABOVE this line!!! **************/
 
 
@@ -118,8 +162,33 @@ asmAbs:
 asmMult:   
 
     /*** STUDENTS: Place your asmMult code BELOW this line!!! **************/
+    push {r4-r11,LR}
+    /*Arm Calling Convention Part 1*/
+    
+    mov r2, 0 
+    /*the spot I'm gonna build up the product while mutliplying*/
+    
+ multiply:
+    tst r1, 1
+    beq skipStep
+    add r2, r2, r0
+    
+ skipStep:
+    lsl r1, r1, 1
+    lsr r0, r0, 1
+    cmp r0, 0
+    bne multiply
+    
+    mov r0, r2
+    b multPop
+    
+ zeroProd:
+    mov r0, 0
+    
+ multPop:    
+    pop {r4-r11,LR}
 
-
+    mov pc, lr	 /*and the thing that ends the function*/
     /*** STUDENTS: Place your asmMult code ABOVE this line!!! **************/
 
    
@@ -140,8 +209,19 @@ asmMult:
 asmFixSign:   
     
     /*** STUDENTS: Place your asmFixSign code BELOW this line!!! **************/
-
+    push {r4-r11,LR}
+    /*Arm Calling Convention Part 1*/
+    cmp r1, r2
+    /*if the sign bits are the same, positive result, if they aren't, negative*/
+    beq done
     
+    neg r0, r0
+    /*makes r0 2's complemented if the sign bits aren't the same*/
+    
+    
+    pop {r4-r11,LR}
+
+    mov pc, lr	 /*and the thing that ends the function*/   
     /*** STUDENTS: Place your asmFixSign code ABOVE this line!!! **************/
 
 
@@ -165,43 +245,77 @@ asmFixSign:
 asmMain:   
     
     /*** STUDENTS: Place your asmMain code BELOW this line!!! **************/
-    
-    /* Step 1:
+     push {r4-r11,LR}
+     /*Arm Calling Convention Part 1*/
+     /* Step 1:
      * call asmUnpack. Have it store the output values in a_Multiplicand
      * and b_Multiplier.
      */
-
+     LDR r1, =a_Multiplicand
+     LDR r2, =b_Multiplier
+    
+     BL asmUnpack
+    
 
      /* Step 2a:
       * call asmAbs for the multiplicand (a). Have it store the absolute value
       * in a_Abs, and the sign in a_Sign.
       */
-
+     LDR r0, [r1]
+     LDR r1, =a_Abs
+     LDR r2, =a_Sign
+    
+     BL asmAbs
 
 
      /* Step 2b:
       * call asmAbs for the multiplier (b). Have it store the absolute value
       * in b_Abs, and the sign in b_Sign.
       */
-
-
-
-    /* Step 3:
+     LDR r1, =b_Multiplier
+     LDR r0, [r1]
+     LDR r1, =b_Abs
+     LDR r2, =b_Sign
+    
+     BL asmAbs
+     /* Step 3:
      * call asmMult. Pass a_Abs as the multiplicand, 
      * and b_Abs as the multiplier.
      * asmMult returns the initial (positive) product in r0.
      * In this function (asmMain), store the output value  
      * returned asmMult in r0 to mem location init_Product.
      */
+     LDR r4, =a_Abs
+     LDR r5, =b_Abs
+    
+     LDR r0, [r4]
+     LDR r1, [r5]
+    
+     BL asmMult
+    
+     LDR r4, =init_Product
+     STR r0, [r4]
+    
 
 
-    /* Step 4:
+     /* Step 4:
      * call asmFixSign. Pass in the initial product, and the
      * sign bits for the original a and b inputs. 
      * asmFixSign returns the final product with the correct
      * sign. Store the value returned in r0 to mem location 
      * final_Product.
      */
+    
+     LDR r4, =init_Product
+     LDR r0, [r4]
+    
+     LDR r5, =a_Sign
+     LDR r6, =b_Sign
+    
+     LDR r1, [r5]
+     LDR r2, [r6]
+    
+     BL asmFixSign
 
 
      /* Step 5:
@@ -212,7 +326,14 @@ asmMain:
       */
 
 
-    
+done:    
+    /* restore registers, Arm Calling Convention Part 2*/
+    mov r0,r0 /* these are do-nothing lines to deal with IDE mem display bug */
+    mov r0,r0 
+
+screen_shot:    pop {r4-r11,LR}
+
+    mov pc, lr	 /*and the thing that ends the function*/    
     /*** STUDENTS: Place your asmMain code ABOVE this line!!! **************/
 
 
